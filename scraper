@@ -1,0 +1,127 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import Select
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+import time
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from bs4 import BeautifulSoup
+import requests
+import pandas as pd
+
+driver_service = Service(executable_path="C:\Program Files (x86)\chromedriver.exe")
+driver = webdriver.Chrome(service=driver_service)
+
+driver.get("https://nvna.eu/wp/")
+
+try:
+    group = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.NAME, "group"))
+    )
+    group.send_keys("122201")
+except:
+    driver.quit()
+
+group_radio = driver.find_element(By.ID, "groupRadio")
+group_radio.click()
+
+select = Select(driver.find_element(By.NAME, "Week"))
+
+options = select.options
+# data = {
+#     "Date": ["Четвъртък 2022 08 25", "Четвъртък 2022 08 25","Четвъртък 2022 08 25"],
+#     "Number": ['1', '2','3'],
+#     "Hour": ['', '','9.50-11.30'],
+#     "Discipline": ['', '','Бази Данни'],
+#     "Room": ['', '','зала 1410'],
+#     "Teacher": ['', '','Мечев'],
+#
+# }
+# DICT TO CSV FILE
+data = {
+    "Date": [],
+    "Number": [],
+    "Hour": [],
+    "Discipline": [],
+    "Room": [],
+    "Teacher": []
+}
+for i in range(len(options) - 1):
+    select = Select(driver.find_element(By.NAME, "Week"))
+    select.select_by_index(i)
+    button = driver.find_element(By.XPATH, "//input[@value='Покажи']")
+    button.click()
+
+    curr_url = driver.current_url
+
+    page = requests.get(curr_url)
+    doc = BeautifulSoup(page.content, "html.parser")
+
+    rows = doc.find_all("tr")
+    '''Изрязваме ненужните редове'''
+    rows = rows[3:-1:1]
+    # print(rows)
+
+    current_date = None
+    for row in rows:
+        columns = row.find_all("td")
+        # print(columns)
+
+        '''Ако има id за td таг знаем ,че сме на ред с ден от седмицата понеже '''
+        if columns[0].attrs.get("id") is not None:
+            date = columns[0].string
+            # data[date] = "to_add"
+            current_date = date
+            data["Date"].append(date)
+            #print(date)
+        elif columns[0].string == "Няма занятия":
+            data["Number"].append("Няма занятия")
+            data["Hour"].append("")
+            data["Discipline"].append("")
+            data["Room"].append("")
+            data["Teacher"].append("")
+
+            #print(columns[0].string)  # list
+            # data[current_date] = columns[0].string
+
+            # print(column.string)
+        else:
+            ''' Добавяме към текущия ден докато current_date не се смени на друг ден '''
+            data["Date"].append(current_date)
+            if len(columns) == 5:  # Normal rows
+                for idx in range(0, 5):
+                    columns[idx] = columns[idx].string
+                    ''' Ако columns[idx] е NoneTypeObject хвърля грешка при метода replace() '''
+                    try:
+                        columns[idx] = columns[idx].replace('\n', '')
+                        columns[idx] = columns[idx].replace('\t', '')
+                    except:
+                        columns[idx] = ''
+
+                data["Number"].append(columns[0])
+                data["Hour"].append(columns[1])
+                data["Discipline"].append(columns[2])
+                data["Room"].append(columns[3])
+                data["Teacher"].append(columns[4])
+            else:  # Defect rows
+                pass
+    print(len(data["Date"]))
+    print(len(data["Number"]))
+    print(len(data["Hour"]))
+    print(len(data["Discipline"]))
+    print(len(data["Room"]))
+    print(len(data["Teacher"]))
+    df = pd.DataFrame(data)
+
+    print(df)
+
+
+
+    time.sleep(3)
+
+time.sleep(30)
+driver.quit()
+
