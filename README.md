@@ -1,3 +1,3 @@
 # test
 
-Hello Odin1
+Go to master!
