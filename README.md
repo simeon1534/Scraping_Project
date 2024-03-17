@@ -1,3 +1,1 @@
-# test
-
-Go to master!
+Scraping schedule for university
